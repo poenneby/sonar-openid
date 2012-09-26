@@ -19,17 +19,21 @@
  */
 package org.sonar.plugins.openid;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import org.apache.commons.lang.StringUtils;
 import org.openid4java.consumer.ConsumerManager;
 import org.openid4java.consumer.InMemoryConsumerAssociationStore;
 import org.openid4java.consumer.InMemoryNonceVerifier;
 import org.openid4java.consumer.VerificationResult;
 import org.openid4java.discovery.Discovery;
+import org.openid4java.discovery.DiscoveryException;
 import org.openid4java.discovery.DiscoveryInformation;
 import org.openid4java.discovery.Identifier;
+import org.openid4java.discovery.UrlIdentifier;
 import org.openid4java.message.AuthRequest;
 import org.openid4java.message.AuthSuccess;
 import org.openid4java.message.ParameterList;
@@ -46,14 +50,15 @@ import org.sonar.api.security.UserDetails;
 import org.sonar.plugins.openid.api.OpenIdExtension;
 import org.sonar.plugins.openid.api.OpenIdUtils;
 
-import java.net.URL;
-import java.util.Collections;
-import java.util.List;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 public class OpenIdClient implements ServerExtension {
 
   public static final String PROPERTY_SONAR_URL = "sonar.openid.sonarServerUrl";
   public static final String PROPERTY_OPENID_URL = "sonar.openid.providerUrl";
+  public static final String PROPERTY_OPENID_DOMAIN = "sonar.openid.domainName";
 
   static final String AX_ATTR_EMAIL = "email";
   static final String SREG_ATTR_EMAIL = "email";
@@ -128,6 +133,39 @@ public class OpenIdClient implements ServerExtension {
     manager.setAssociations(new InMemoryConsumerAssociationStore());
     manager.setNonceVerifier(new InMemoryNonceVerifier(5000));
     manager.getRealmVerifier().setEnforceRpId(false);
+    manager.setDiscovery(new Discovery() {
+        /**
+         * See http://www.slideshare.net/timdream/google-apps-account-as-openid for more details
+         * why this is needed. Basically, once Google reports back that the user is actually http://mycorp.com/openid?id=12345,
+         * the consumer still needs to try to resolve this ID to make sure that Google didn't return a bogus address
+         * (say http://whitehouse.gov/barack_obama). This fails unless the web server of mycorp.com handles
+         * GET to http://mycorp.com/openid?id=12345 properly, (which it doesn't most of the time.)
+         *
+         * The actual resource is in https://www.google.com/accounts/o8/user-xrds?uri=http://mycorp.com/openid?id=12345
+         * so does Yadris lookup on that URL and pretend as if that came from http://mycorp.com/openid?id=12345
+         */
+        @Override
+        public List discover(Identifier id) throws DiscoveryException {
+            if (id.getIdentifier().startsWith("http://" + settings.getString(PROPERTY_OPENID_DOMAIN) + "/") && id instanceof UrlIdentifier) {
+                String source = "https://www.google.com/accounts/o8/user-xrds?uri=" + id.getIdentifier();
+                List<DiscoveryInformation> r = super.discover(new UrlIdentifier(source));
+                List<DiscoveryInformation> x = new ArrayList<DiscoveryInformation>();
+                for (DiscoveryInformation discovered : r) {
+                    if (discovered.getClaimedIdentifier().getIdentifier().equals(source)) {
+                        discovered = new DiscoveryInformation(discovered.getOPEndpoint(),
+                                id,
+                                discovered.getDelegateIdentifier(),
+                                discovered.getVersion(),
+                                discovered.getTypes()
+                        );
+                    }
+                    x.add(discovered);
+                }
+                return x;
+            }
+            return super.discover(id);
+        }
+    });
   }
 
   AuthRequest createAuthenticationRequest() {
