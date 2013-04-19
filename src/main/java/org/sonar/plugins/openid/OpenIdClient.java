@@ -231,17 +231,13 @@ public class OpenIdClient implements ServerExtension {
 
       SRegResponse sr = OpenIdUtils.getMessageAs(SRegResponse.class, authSuccess, SRegMessage.OPENID_NS_SREG);
       if (sr != null) {
-        name = sr.getAttributeValue(SREG_ATTR_FULLNAME);
+        name = sr.getAttributeValue(SREG_ATTR_EMAIL);
         email = sr.getAttributeValue(SREG_ATTR_EMAIL);
       }
       FetchResponse fr = OpenIdUtils.getMessageAs(FetchResponse.class, authSuccess, AxMessage.OPENID_NS_AX);
       if (fr != null) {
         if (name == null) {
-          String first = fr.getAttributeValue(AX_ATTR_FIRSTNAME);
-          String last = fr.getAttributeValue(AX_ATTR_LASTNAME);
-          if (first != null && last != null) {
-            name = first + " " + last;
-          }
+          name = fr.getAttributeValue(AX_ATTR_EMAIL);
         }
         if (email == null) {
           email = fr.getAttributeValue(AX_ATTR_EMAIL);

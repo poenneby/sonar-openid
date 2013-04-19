@@ -130,7 +130,7 @@ public class OpenIdClientTest {
 
     UserDetails user = OpenIdClient.toUser(authSuccess);
 
-    assertThat(user.getName()).isEqualTo("me");
+    assertThat(user.getName()).isEqualTo("me@here.com");
     assertThat(user.getEmail()).isEqualTo("me@here.com");
   }
 
@@ -158,7 +158,7 @@ public class OpenIdClientTest {
 
     UserDetails user = OpenIdClient.toUser(authSuccess);
 
-    assertThat(user.getName()).isEqualTo("Rick Hunter");
+    assertThat(user.getName()).isEqualTo("rick@hunter.com");
     assertThat(user.getEmail()).isEqualTo("rick@hunter.com");
   }
 
@@ -232,6 +232,7 @@ public class OpenIdClientTest {
     verification.setVerifiedId(new UrlIdentifier("http://example.com"));
     SRegResponse sRegResponse = SRegResponse.createSRegResponse(new ParameterList());
     sRegResponse.addAttribute(OpenIdClient.SREG_ATTR_FULLNAME, "marius");
+    sRegResponse.addAttribute(OpenIdClient.SREG_ATTR_EMAIL, "marius@who.com");
     AuthSuccess authSuccess = mock(AuthSuccess.class);
     when(authSuccess.hasExtension(SRegMessage.OPENID_NS_SREG)).thenReturn(true);
     when(authSuccess.getExtension(SRegMessage.OPENID_NS_SREG)).thenReturn(sRegResponse);
